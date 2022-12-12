@@ -18,6 +18,7 @@ Features
   resources with tag, vpc, etc).
 - Can be combined with arbitrary actions
 - Can omit a set of dates such as public holidays.
+- Regional offhours support for AWS Regions
 
 Policy Configuration
 ====================
@@ -28,7 +29,8 @@ different policy, they support the same configuration options:
  - **weekends**: default true, whether to leave resources off for the weekend
  - **weekends-only**: default false, whether to turn the resource off only on
    the weekend
- - **default_tz**: which timezone to utilize when evaluating time **(REQUIRED)**
+ - **default_tz**: which timezone to utilize when evaluating time. If not specifies
+   a timezone closet to executing region will be used 
  - **fallback-schedule**: If a resource doesn't support tagging or doesn't provide
    a tag you can supply a default schedule that will be used. When the tag is provided
    this will be ignored. See :ref:`ScheduleParser Time Specifications <scheduleparser-time-spec>`.
@@ -130,7 +132,7 @@ specifications can be combined in square-bracketed lists, i.e.
 Policy examples
 ===============
 
-Turn ec2 instances on and off
+Turn ec2 instances on and off during regional times
 
 .. code-block:: yaml
 
@@ -146,6 +148,27 @@ Turn ec2 instances on and off
        resource: ec2
        filters:
          - type: onhour
+       actions:
+         - start
+
+Turn ec2 instances on and off during specific timezone times
+
+.. code-block:: yaml
+
+   policies:
+     - name: offhours-stop
+       resource: ec2
+       filters:
+          - type: offhour
+            default_tz: pt
+       actions:
+         - stop
+
+     - name: offhours-start
+       resource: ec2
+       filters:
+         - type: onhour
+           default_tz: pt
        actions:
          - start
 
@@ -326,6 +349,35 @@ class Time(Filter):
         'nzst': 'Pacific/Auckland',
         'utc': 'Etc/UTC',
     }
+
+    REGION_TZ = {
+        'us-east-1': 'et',
+        'us-west-1': 'pt',
+        'us-east-2': 'et',
+        'us-west-2': 'pt',
+        'ap-south-1': 'it',
+        'ap-northeast-3': 'jst',
+        'ap-northeast-2': 'kst',
+        'ap-northeast-1': 'jst',
+        'ap-southeast-1': 'sgt',
+        'ap-southeast-2': 'aet',
+        'ca-central-1': 'et',
+        'eu-central-1': 'cet',
+        'eu-west-1': 'gmt',
+        'eu-west-2': 'bst',
+        'eu-west-3': 'cet',
+        'eu-north-1': 'cet',
+        'sa-east-1': 'brt',
+        'af-south-1': 'etc/gmt+2',
+        'ap-east-1': 'etc/gmt+8',
+        'ap-south-2': 'it',
+        'ap-southeast-3': 'etc/gmt+7',
+        'eu-south-1': 'cet',
+        'eu-south-2': 'cet',
+        'eu-central-2': 'cet',
+        'me-south-1': 'etc/gmt+3',
+        'me-central-1': 'etc/gmt+4',
+    }
     TAG_RESTRICTIONS = ["(", ")", "[", "]", ",", ";", "=", "/"]
     # mapping to ['u28', 'u29', 'u5b', 'u5d', 'u2c', 'u3b', 'u3d', 'u2f']
     TAG_RESTRICTIONS_ESCAPE = ["u" + hex(ord(c))[2:] for c in TAG_RESTRICTIONS]
@@ -339,6 +391,11 @@ class Time(Filter):
 
     def __init__(self, data, manager=None):
         super(Time, self).__init__(data, manager)
+        if manager is not None:
+            self.region = manager.config.region
+        else:
+            self.region = 'us-east-1'
+        self.requested_tz = self.data.get('default_tz', '')
         self.default_tz = self.data.get('default_tz', self.DEFAULT_TZ)
         self.weekends = self.data.get('weekends', True)
         self.weekends_only = self.data.get('weekends-only', False)
@@ -513,9 +570,15 @@ class OffHour(Time):
     DEFAULT_HR = 19
 
     def get_default_schedule(self):
-        default = {'tz': self.default_tz, self.time_type: [
-            {'hour': self.data.get(
-                "%shour" % self.time_type, self.DEFAULT_HR)}]}
+        # if no default_tz was set in policy, use tz for region
+        if self.requested_tz == '' and self.region and self.region in self.REGION_TZ:
+            default = {'tz': self.REGION_TZ[self.region], self.time_type: [
+                {'hour': self.data.get(
+                    "%shour" % self.time_type, self.DEFAULT_HR)}]}
+        else:
+            default = {'tz': self.default_tz, self.time_type: [
+                {'hour': self.data.get(
+                    "%shour" % self.time_type, self.DEFAULT_HR)}]}
         if self.weekends_only:
             default[self.time_type][0]['days'] = [4]
         elif self.weekends:
@@ -535,9 +598,15 @@ class OnHour(Time):
     DEFAULT_HR = 7
 
     def get_default_schedule(self):
-        default = {'tz': self.default_tz, self.time_type: [
-            {'hour': self.data.get(
-                "%shour" % self.time_type, self.DEFAULT_HR)}]}
+        # if no default_tz was set in policy, use tz for region
+        if self.requested_tz == '' and self.region and self.region in self.REGION_TZ:
+            default = {'tz': self.REGION_TZ[self.region], self.time_type: [
+                {'hour': self.data.get(
+                    "%shour" % self.time_type, self.DEFAULT_HR)}]}
+        else:
+            default = {'tz': self.default_tz, self.time_type: [
+                {'hour': self.data.get(
+                    "%shour" % self.time_type, self.DEFAULT_HR)}]}
         if self.weekends_only:
             # turn on monday
             default[self.time_type][0]['days'] = [0]
