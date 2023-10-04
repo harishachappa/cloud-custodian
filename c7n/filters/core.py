@@ -16,14 +16,20 @@ from dateutil.tz import tzutc
 from dateutil.parser import parse
 from distutils import version
 from random import sample
-import jmespath
 
 from c7n.element import Element
 from c7n.exceptions import PolicyValidationError, PolicyExecutionError
 from c7n.manager import ResourceManager
 from c7n.registry import PluginRegistry
 from c7n.resolver import ValuesFrom
-from c7n.utils import set_annotation, type_schema, parse_cidr, parse_date
+from c7n.utils import (
+    set_annotation,
+    type_schema,
+    parse_cidr,
+    parse_date,
+    jmespath_search,
+    jmespath_compile
+)
 from c7n.manager import iter_filters
 
 
@@ -100,7 +106,7 @@ OPERATORS = {
 VALUE_TYPES = [
     'age', 'integer', 'expiration', 'normalize', 'size',
     'cidr', 'cidr_size', 'swap', 'resource_count', 'expr',
-    'unique_size', 'date', 'version']
+    'unique_size', 'date', 'version', 'float']
 
 
 class FilterRegistry(PluginRegistry):
@@ -249,7 +255,7 @@ class BaseValueFilter(Filter):
         elif k in i:
             r = i.get(k)
         elif k not in self.expr:
-            self.expr[k] = jmespath.compile(k)
+            self.expr[k] = jmespath_compile(k)
             r = self.expr[k].search(i)
         else:
             r = self.expr[k].search(i)
@@ -350,7 +356,7 @@ class Or(BooleanGroupFilter):
         rtype_id = self.get_resource_type_id()
         compiled = None
         if '.' in rtype_id:
-            compiled = jmespath.compile(rtype_id)
+            compiled = jmespath_compile(rtype_id)
             resource_map = {compiled.search(r): r for r in resources}
         else:
             resource_map = {r[rtype_id]: r for r in resources}
@@ -403,7 +409,7 @@ class Not(BooleanGroupFilter):
         rtype_id = self.get_resource_type_id()
         compiled = None
         if '.' in rtype_id:
-            compiled = jmespath.compile(rtype_id)
+            compiled = jmespath_compile(rtype_id)
             resource_map = {compiled.search(r): r for r in resources}
         else:
             resource_map = {r[rtype_id]: r for r in resources}
@@ -436,7 +442,7 @@ class AnnotationSweeper:
         resource_map = {}
         compiled = None
         if '.' in id_key:
-            compiled = jmespath.compile(self.id_key)
+            compiled = jmespath_compile(self.id_key)
         for r in resources:
             if compiled:
                 id_ = compiled.search(r)
@@ -451,7 +457,7 @@ class AnnotationSweeper:
     def sweep(self, resources):
         compiled = None
         if '.' in self.id_key:
-            compiled = jmespath.compile(self.id_key)
+            compiled = jmespath_compile(self.id_key)
             diff = set(self.ra_map).difference([compiled.search(r) for r in resources])
         else:
             diff = set(self.ra_map).difference([r[self.id_key] for r in resources])
@@ -613,7 +619,7 @@ class ValueFilter(BaseValueFilter):
         This implementation allows for the comparison of two separate lists of values
         within the same resource.
         """
-        return jmespath.search(self.data.get('value_path'),i)
+        return jmespath_search(self.data.get('value_path'),i)
 
     def match(self, i):
         if self.v is None and len(self.data) == 1:
@@ -678,6 +684,11 @@ class ValueFilter(BaseValueFilter):
                 value = int(str(value).strip())
             except ValueError:
                 value = 0
+        elif self.vtype == 'float':
+            try:
+                value = float(str(value).strip())
+            except ValueError:
+                value = 0.0
         elif self.vtype == 'size':
             try:
                 return sentinel, len(value)
@@ -1135,8 +1146,16 @@ class ListItemFilter(Filter):
     def expr(self):
         if self._expr:
             return self._expr
-        self._expr = jmespath.compile(self.data['key'])
+        self._expr = jmespath_compile(self.data['key'])
         return self._expr
+
+    def check_count(self, rcount):
+        if 'count' not in self.data:
+            return False
+        count = self.data['count']
+        op = OPERATORS[self.data.get('count_op', 'eq')]
+        if op(rcount, count):
+            return True
 
     def process(self, resources, event=None):
         result = []
@@ -1145,6 +1164,8 @@ class ListItemFilter(Filter):
         for r in resources:
             list_values = self.get_item_values(r)
             if not list_values:
+                if self.check_count(0):
+                    result.append(r)
                 continue
             if not isinstance(list_values, list):
                 item_type = type(list_values)
@@ -1157,10 +1178,8 @@ class ListItemFilter(Filter):
             matched_indicies = [r['c7n:_id'] for r in list_resources]
             for idx, list_value in enumerate(list_values):
                 list_value.pop('c7n:_id')
-            if self.data.get('count'):
-                count = self.data['count']
-                op = OPERATORS[self.data.get('count_op', 'eq')]
-                if op(len(list_resources), count):
+            if 'count' in self.data:
+                if self.check_count(len(list_resources)):
                     result.append(r)
             elif list_resources:
                 if not self.annotate_items:

@@ -4,10 +4,10 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 import json
 import logging
-import mock
 import os
 import shutil
 import tempfile
+from unittest import mock
 
 from c7n import policy, manager
 from c7n.config import Config
@@ -203,7 +203,8 @@ class PolicyMetaLint(BaseTest):
         overrides = overrides.difference(
             {'account', 's3', 'hostedzone', 'log-group', 'rest-api', 'redshift-snapshot',
              'rest-stage', 'codedeploy-app', 'codedeploy-group', 'fis-template', 'dlm-policy',
-             'apigwv2', 'apigw-domain-name'})
+             'apigwv2', 'apigwv2-stage', 'apigw-domain-name', 'fis-experiment',
+             'launch-template-version'})
         if overrides:
             raise ValueError("unknown arn overrides in %s" % (", ".join(overrides)))
 
@@ -263,6 +264,12 @@ class PolicyMetaLint(BaseTest):
         whitelist = set(('AwsS3Object', 'Container'))
         todo = set((
             # q2 2023
+            'AwsAthenaWorkGroup',
+            'AwsStepFunctionStateMachine',
+            'AwsGuardDutyDetector',
+            'AwsAmazonMqBroker',
+            'AwsAppSyncGraphQlApi',
+            'AwsEventSchemasRegistry',
             "AwsEc2RouteTable",
             # q1 2023
             'AwsWafv2RuleGroup',
@@ -358,7 +365,82 @@ class PolicyMetaLint(BaseTest):
         # of a resource.
 
         whitelist = {
-            # q2 2023
+            # q3 2023
+            "AWS::ACMPCA::CertificateAuthority",
+            "AWS::Amplify::Branch",
+            "AWS::AppConfig::HostedConfigurationVersion",
+            "AWS::AppIntegrations::EventIntegration",
+            "AWS::AppMesh::Route",
+            "AWS::AppMesh::VirtualGateway",
+            "AWS::AppMesh::VirtualRouter",
+            "AWS::AppRunner::Service",
+            "AWS::Athena::PreparedStatement",
+            "AWS::CustomerProfiles::ObjectType",
+            "AWS::DMS::Endpoint",
+            "AWS::EC2::CapacityReservation",
+            "AWS::EC2::ClientVpnEndpoint",
+            "AWS::EC2::IPAMScope",
+            "AWS::Evidently::Launch",
+            "AWS::Forecast::DatasetGroup",
+            "AWS::GreengrassV2::ComponentVersion",
+            "AWS::GroundStation::MissionProfile",
+            "AWS::Kendra::Index",
+            "AWS::KinesisVideo::Stream",
+            "AWS::Logs::Destination",
+            "AWS::MSK::Configuration",
+            "AWS::MediaConnect::FlowEntitlement",
+            "AWS::MediaConnect::FlowVpcInterface",
+            "AWS::MediaTailor::PlaybackConfiguration",
+            "AWS::NetworkManager::CustomerGatewayAssociation",
+            "AWS::NetworkManager::LinkAssociation",
+            "AWS::Personalize::Dataset",
+            "AWS::Personalize::Schema",
+            "AWS::Personalize::Solution",
+            "AWS::Pinpoint::EmailChannel",
+            "AWS::Pinpoint::EmailTemplate",
+            "AWS::Pinpoint::EventStream",
+            "AWS::ResilienceHub::App",
+            "AWS::S3::AccessPoint",
+            # q2 2023 wave 3
+            "AWS::Amplify::App",
+            "AWS::AppMesh::VirtualNode",
+            "AWS::AppMesh::VirtualService",
+            "AWS::AppRunner::VpcConnector",
+            "AWS::AppStream::Application",
+            "AWS::Cassandra::Keyspace",
+            "AWS::ECS::TaskSet",
+            "AWS::Evidently::Project",
+            "AWS::Forecast::Dataset",
+            "AWS::Pinpoint::Campaign",
+            "AWS::Pinpoint::InAppTemplate",
+            "AWS::SageMaker::Domain",
+            "AWS::Signer::SigningProfile",
+            "AWS::Transfer::Agreement",
+            "AWS::Transfer::Connector",
+            # q2 2023 wave 2
+            "AWS::AppConfig::DeploymentStrategy",
+            "AWS::AppFlow::Flow",
+            "AWS::AuditManager::Assessment",
+            "AWS::CloudWatch::MetricStream",
+            "AWS::DeviceFarm::InstanceProfile",
+            "AWS::EC2::EC2Fleet",
+            "AWS::EC2::SubnetRouteTableAssociation",
+            "AWS::ECR::PullThroughCacheRule",
+            "AWS::GroundStation::Config",
+            "AWS::ImageBuilder::ImagePipeline",
+            "AWS::IoT::FleetMetric",
+            "AWS::IoTWireless::ServiceProfile",
+            "AWS::NetworkManager::Device",
+            "AWS::NetworkManager::GlobalNetwork",
+            "AWS::NetworkManager::Link",
+            "AWS::NetworkManager::Site",
+            "AWS::Panorama::Package",
+            "AWS::Pinpoint::App",
+            "AWS::Redshift::ScheduledAction",
+            "AWS::Route53Resolver::FirewallRuleGroupAssociation",
+            "AWS::SageMaker::AppImageConfig",
+            "AWS::SageMaker::Image",
+            # q2 2023 wave 1
             "AWS::AppStream::DirectoryConfig",
             "AWS::AutoScaling::WarmPool",
             "AWS::Connect::PhoneNumber",
@@ -436,7 +518,6 @@ class PolicyMetaLint(BaseTest):
             'AWS::IoTSiteWise::Project',
             'AWS::IoTTwinMaker::Entity',
             'AWS::IoTTwinMaker::Workspace',
-            'AWS::Lex::Bot',
             'AWS::Lex::BotAlias',
             'AWS::Lightsail::Bucket',
             'AWS::Lightsail::Certificate',
@@ -458,9 +539,9 @@ class PolicyMetaLint(BaseTest):
             'AWS::SES::ReceiptRuleSet',
             'AWS::SES::Template',
             'AWS::ServiceDiscovery::HttpNamespace',
-            'AWS::Transfer::Workflow',      
-            # 
-            'AWS::ApiGatewayV2::Stage',
+            'AWS::Transfer::Workflow',
+            #
+            # 'AWS::ApiGatewayV2::Stage',
             'AWS::Athena::DataCatalog',
             'AWS::Athena::WorkGroup',
             'AWS::AutoScaling::ScalingPolicy',
@@ -473,7 +554,6 @@ class PolicyMetaLint(BaseTest):
             'AWS::Detective::Graph',
             'AWS::DMS::Certificate',
             'AWS::EC2::EgressOnlyInternetGateway',
-            'AWS::EC2::FlowLog',
             'AWS::EC2::LaunchTemplate',
             'AWS::EC2::RegisteredHAInstance',
             'AWS::EC2::TransitGatewayAttachment',
@@ -515,7 +595,7 @@ class PolicyMetaLint(BaseTest):
             'AWS::WAFv2::ManagedRuleSet',
             'AWS::WAFv2::RegexPatternSet',
             'AWS::WAFv2::RuleGroup',
-            'AWS::WAFv2::WebACL',
+            # 'AWS::WAFv2::WebACL',
             'AWS::XRay::EncryptionConfig',
             'AWS::ElasticLoadBalancingV2::Listener',
             'AWS::AccessAnalyzer::Analyzer',
@@ -536,7 +616,6 @@ class PolicyMetaLint(BaseTest):
             'AWS::Detective::Graph',
             'AWS::EC2::TransitGatewayRouteTable',
             'AWS::AppSync::GraphQLApi',
-            'AWS::DataSync::Task',
             'AWS::Glue::Job',
             'AWS::SageMaker::NotebookInstanceLifecycleConfig',
             'AWS::SES::ContactList',
@@ -568,6 +647,11 @@ class PolicyMetaLint(BaseTest):
         model = session.get_service_model('config')
         shape = model.shape_for('ResourceType')
 
+        present = resource_config_types.intersection(whitelist)
+        if present:
+            raise AssertionError(
+                "Supported config types \n %s" % ('\n'.join(sorted(present))))
+
         config_types = set(shape.enum).difference(whitelist)
         missing = config_types.difference(resource_config_types)
         if missing:
@@ -579,7 +663,7 @@ class PolicyMetaLint(BaseTest):
             'AWS::ECS::Service',
             'AWS::ECS::TaskDefinition',
             'AWS::NetworkFirewall::Firewall',
-            'AWS::WAFv2::WebACL'
+            'AWS::DMS::ReplicationTask',
         }
         bad_types = resource_config_types.difference(config_types)
         bad_types = bad_types.difference(invalid_ignore)
@@ -626,6 +710,8 @@ class PolicyMetaLint(BaseTest):
             'rest-api',
             'rest-stage',
             'apigw-domain-name',
+            # our check doesn't handle nested resource types in the arn
+            'guardduty-finding',
             # synthetics ~ ie. c7n introduced since non exist.
             # or in some cases where it exists but not usable in iam.
             'scaling-policy',
@@ -634,7 +720,8 @@ class PolicyMetaLint(BaseTest):
             'event-rule-target',
             'rrset',
             'redshift-reserved',
-            'elasticsearch-reserved'
+            'elasticsearch-reserved',
+            'ses-receipt-rule-set'
         ))
 
         for k, v in manager.resources.items():
@@ -724,6 +811,8 @@ class PolicyMetaLint(BaseTest):
             'rest-stage', 'rest-resource', 'rest-vpclink', 'rest-client-certificate'}
         explicit = []
         whitelist_explicit = {
+            'securityhub-finding', 'ssm-patch-group',
+            'appdiscovery-agent', 'athena-named-query',
             'rest-account', 'shield-protection', 'shield-attack',
             'dlm-policy', 'efs', 'efs-mount-target', 'gamelift-build',
             'glue-connection', 'glue-dev-endpoint', 'cloudhsm-cluster',
@@ -825,6 +914,7 @@ class PolicyMetaLint(BaseTest):
                     "instance-uptime",
                     "dead-letter",
                     "list-item",
+                    "ip-address-usage",
                 ):
                     continue
                 qk = "%s.filters.%s" % (k, n)
@@ -1069,8 +1159,6 @@ class TestPolicy(BaseTest):
                 'member-role': 'arn:aws:iam::{account_id}:role/BarFoo',
                 'role': 'FooBar'},
             'actions': [
-                {'type': 'tag',
-                 'value': 'bad monkey {account_id} {region} {now:+2d%Y-%m-%d}'},
                 {'type': 'notify',
                  'to': ['me@example.com'],
                  'transport': {
@@ -1080,16 +1168,67 @@ class TestPolicy(BaseTest):
                  'subject': "S3 - Cross-Account -[custodian {{ account }} - {{ region }}]"},
             ]}, config={'account_id': '12312311', 'region': 'zanzibar'})
 
-        ivalue = 'bad monkey 12312311 zanzibar %s' % (
-            (datetime.utcnow() + timedelta(2)).strftime('%Y-%m-%d'))
         p.expand_variables(p.get_variables())
-        self.assertEqual(p.data['actions'][0]['value'], ivalue)
         self.assertEqual(
-            p.data['actions'][1]['subject'],
+            p.data['actions'][0]['subject'],
             "S3 - Cross-Account -[custodian {{ account }} - {{ region }}]")
         self.assertEqual(p.data['mode']['role'], 'arn:aws:iam::12312311:role/FooBar')
         self.assertEqual(p.data['mode']['member-role'], 'arn:aws:iam::{account_id}:role/BarFoo')
-        self.assertEqual(p.resource_manager.actions[0].data['value'], ivalue)
+
+    def test_now_interpolation(self):
+        """Test interpolation of the {now} placeholder
+
+        - Only interpolate the value at runtime, not during provisioning
+        - When deferring interpolation, pass through custom format specifiers
+        """
+
+        pull_mode_policy = self.load_policy({
+            'name': 'compute',
+            'resource': 'aws.ec2',
+            'actions': [
+                {'type': 'tag',
+                 'value': 'bad monkey {account_id} {region} {now:+2d%Y-%m-%d}'},
+                {'type': 'tag',
+                 'key': 'escaped_braces',
+                 'value': '{{now}}'},
+            ]}, config={'account_id': '12312311', 'region': 'zanzibar'})
+        lambda_mode_policy = self.load_policy({
+            **pull_mode_policy.data,
+            **{
+                'mode': {
+                    'type': 'config-rule',
+                    'role': 'FooBar'},
+            }
+        }, config=pull_mode_policy.ctx.options)
+
+        provision_time_value = 'bad monkey 12312311 zanzibar {now:+2d%Y-%m-%d}'
+        run_time_value = 'bad monkey 12312311 zanzibar %s' % (
+            (datetime.utcnow() + timedelta(2)).strftime('%Y-%m-%d'))
+
+        pull_mode_policy.expand_variables(pull_mode_policy.get_variables())
+        self.assertEqual(
+            pull_mode_policy.data['actions'][0]['value'],
+            run_time_value
+        )
+        self.assertEqual(
+            pull_mode_policy.resource_manager.actions[0].data['value'],
+            run_time_value
+        )
+
+        lambda_mode_policy.expand_variables(lambda_mode_policy.get_variables())
+        self.assertEqual(
+            lambda_mode_policy.data['actions'][0]['value'],
+            provision_time_value
+        )
+        self.assertEqual(
+            lambda_mode_policy.resource_manager.actions[0].data['value'],
+            provision_time_value
+        )
+        # Validate historical use of {{now}} to defer interpolation
+        self.assertEqual(
+            lambda_mode_policy.resource_manager.actions[1].data['value'],
+            '{now}'
+        )
 
     def test_child_resource_trail_validation(self):
         self.assertRaises(

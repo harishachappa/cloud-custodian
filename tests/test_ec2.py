@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 import logging
 import unittest
+from unittest import mock
 import time
 
 import datetime
 from dateutil import tz
-import jmespath
-from mock import mock
+
 
 from c7n.testing import mock_datetime_now
 from c7n.exceptions import PolicyValidationError, ClientError
@@ -292,6 +292,28 @@ class TestMetricFilter(BaseTest):
                         "name": "CPUUtilization",
                         "days": 3,
                         "value": 1.5,
+                    }
+                ],
+            },
+            session_factory=session_factory,
+        )
+        resources = policy.run()
+        self.assertEqual(len(resources), 1)
+
+    def test_metric_filter_multiple_datapoints(self):
+        session_factory = self.replay_flight_data("test_metric_filter_multiple_datapoints")
+        policy = self.load_policy(
+            {
+                "name": "ec2-utilization-per-day",
+                "resource": "ec2",
+                "filters": [
+                    {
+                        "type": "metrics",
+                        "name": "CPUUtilization",
+                        "days": 3,
+                        "period": 86400,
+                        "value": 1,
+                        "op": "lte"
                     }
                 ],
             },
@@ -2038,7 +2060,7 @@ class TestModifySecurityGroupAction(BaseTest):
         if self.recording:
             time.sleep(3)
         self.assertEqual(
-            jmespath.search(
+            utils.jmespath_search(
                 "Reservations[].Instances[].SecurityGroups[].GroupName",
                 client.describe_instances(InstanceIds=["i-094207d64930768dc"])),
             ["launch-wizard-2"])
@@ -2061,7 +2083,7 @@ class TestModifySecurityGroupAction(BaseTest):
         self.assertEqual(len(resources), 1)
         client = session_factory().client('ec2')
         self.assertEqual(
-            jmespath.search(
+            utils.jmespath_search(
                 "Reservations[].Instances[].SecurityGroups[].GroupId",
                 client.describe_instances(InstanceIds=["i-08797f38d2e80c9d0"])),
             ['sg-0cba7a01d343d5c65', 'sg-02e14ba7dd2dbe44b', 'sg-0e630ac9094eff5c5'])
@@ -2167,6 +2189,10 @@ class TestLaunchTemplate(BaseTest):
         resources = p.resource_manager.get_resources([
             'lt-00b3b2755218e3fdd'])
         self.assertEqual(len(resources), 4)
+        self.assertIn(
+            'arn:aws:ec2:us-east-1:644160558196:launch-template/lt-00b3b2755218e3fdd/4',
+            p.resource_manager.get_arns(resources)
+        )
 
     def test_launch_template_versions(self):
         factory = self.replay_flight_data('test_launch_template_query')
